@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.Win32;
+using System;
 using System.Collections;
 using System.Configuration;
 using System.IO;
@@ -7,7 +8,6 @@ using System.ServiceProcess;
 using System.Text.RegularExpressions;
 using System.Timers;
 using System.Xml;
-using System.Xml.Linq;
 
 namespace VT_Sorting
 {
@@ -83,6 +83,14 @@ namespace VT_Sorting
 
         void ReadIndex()
         {
+            using (RegistryKey key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\VT_Sorting", true))
+            {
+                if (key.GetValue("FailureActions") == null)
+                {
+                    key.SetValue("FailureActions", new byte[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x14, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x60, 0xea, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x60, 0xea, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x60, 0xea, 0x00, 0x00 });
+                }
+            }
+
             if (!(Directory.Exists(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) + "\\log")))
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) + "\\log");

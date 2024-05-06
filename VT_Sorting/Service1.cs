@@ -38,13 +38,18 @@ namespace VT_Sorting
         }
 
         int storageDays = 10;
-        int storageSortingIntervalMinutes = 10;
+        int storageSortingIntervalMinutes = 20;
         bool storageXML = true;
         bool storageСollage = false;
         bool storageVideo = false;
         bool restartingServices = true;
-        int serviceRestartIntervalHours = 24;
+        int serviceRestartIntervalHours = 6;
         int Logindex = 0;
+
+        string sourceFolderPr = "D:\\Duplo";
+        string sourceFolderSc = "D:\\Doris";
+        string sortingFolderPr = "D:\\!Duplo";
+        string sortingFolderSc = "D:\\!Doris";
 
         void Load_Config()
         {
@@ -57,6 +62,12 @@ namespace VT_Sorting
                 storageVideo = Convert.ToBoolean(ConfigurationManager.AppSettings["StorageVideo"]);
                 restartingServices = Convert.ToBoolean(ConfigurationManager.AppSettings["RestartingServices"]);
                 serviceRestartIntervalHours = Convert.ToInt32(ConfigurationManager.AppSettings["ServiceRestartIntervalHours"]);
+
+                sourceFolderPr = ConfigurationManager.AppSettings["SourceFolderPr"];
+                sortingFolderPr = ConfigurationManager.AppSettings["SortingFolderPr"];
+
+                sourceFolderSc = ConfigurationManager.AppSettings["SourceFolderSc"];
+                sortingFolderSc = ConfigurationManager.AppSettings["SortingFolderSc"];
             }
 
             var storageTimer = new System.Timers.Timer(storageSortingIntervalMinutes * 60000);
@@ -116,8 +127,8 @@ namespace VT_Sorting
 
         void OnStorageTimeout(Object source, ElapsedEventArgs e)
         {
-            SortingFiles("D:\\Duplo", "D:\\!Duplo");
-            SortingFiles("D:\\Doris", "D:\\!Doris");
+            SortingFiles(sourceFolderPr, sortingFolderPr);
+            SortingFiles(sourceFolderSc, sortingFolderSc);
         }
 
         void OnServiceRestartTimeout(Object source, ElapsedEventArgs e)
@@ -251,8 +262,8 @@ namespace VT_Sorting
             LogWriteLine($"---------- Service VT_Sorting START ----------");
             Load_Config();
             HashVuolation();
-            SortingFiles("D:\\Duplo", "D:\\!Duplo");
-            SortingFiles("D:\\Doris", "D:\\!Doris");
+            SortingFiles(sourceFolderPr, sortingFolderPr);
+            SortingFiles(sourceFolderSc, sortingFolderSc);
         }
 
         protected override void OnStop()

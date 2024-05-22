@@ -170,32 +170,35 @@ namespace VT_Sorting
         void StartService(string serviceName)
         {
             ServiceController service = new ServiceController(serviceName);
-            LogWriteLine($"---------- Service {serviceName} status {service.Status} ----------"); 
+            LogWriteLine($">>>> Service {serviceName} status {service.Status}");
             if (service.Status != ServiceControllerStatus.Running)
             {
                 service.Start();
-                service.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromMinutes(10));
+                service.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromMinutes(2));
                 LogWriteLine($"---------- Service {serviceName} started ----------");
             }
+            LogWriteLine($">>>> Service {serviceName} status >>>> {service.Status} <<<<");
         }
 
         void StopService(string serviceName)
         {
             ServiceController service = new ServiceController(serviceName);
-            LogWriteLine($"---------- Service {serviceName} status {service.Status} ----------");
+            LogWriteLine($">>>> Service {serviceName} status {service.Status}");
             if (service.Status != ServiceControllerStatus.Stopped)
             {
                 service.Stop();
-                service.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromMinutes(10));
+                service.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromMinutes(2));
+                LogWriteLine($"---------- Service {serviceName} started ----------");
                 if (service.Status != ServiceControllerStatus.StopPending)
                 {
                     foreach (var process in Process.GetProcessesByName(serviceName))
                     {
                         process.Kill();
+                        LogWriteLine($"---------- Service {serviceName} Kill ----------");
                     }
                 }
-                LogWriteLine($"---------- Service {serviceName} stopped ----------");
             }
+            LogWriteLine($">>>> Service {serviceName} status >>>> {service.Status} <<<<");
         }
 
         void processDirectory(string startLocation)

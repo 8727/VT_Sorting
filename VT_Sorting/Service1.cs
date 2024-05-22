@@ -2,12 +2,14 @@
 using System;
 using System.Collections;
 using System.Configuration;
+using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.ServiceProcess;
 using System.Text.RegularExpressions;
 using System.Timers;
 using System.Xml;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 
 namespace VT_Sorting
 {
@@ -155,11 +157,20 @@ namespace VT_Sorting
                 StartService("VTViolations");
                 StartService("VTTrafficExport");
             }
+
+            ServiceController serviceEx = new ServiceController("VTTrafficExport");
+            ServiceController serviceRp = new ServiceController("VTTrafficReplicator");
+
+            if (serviceEx.Status != ServiceControllerStatus.Running || serviceRp.Status != ServiceControllerStatus.Running) 
+            {
+                Process.Start("shutdown", "/r /t 0");
+            }
         }
 
         void StartService(string serviceName)
         {
             ServiceController service = new ServiceController(serviceName);
+            LogWriteLine($"---------- Service {serviceName} status {service.Status} ----------");
             if (service.Status != ServiceControllerStatus.Running)
             {
                 service.Start();
@@ -171,6 +182,7 @@ namespace VT_Sorting
         void StopService(string serviceName)
         {
             ServiceController service = new ServiceController(serviceName);
+            LogWriteLine($"---------- Service {serviceName} status {service.Status} ----------");
             if (service.Status != ServiceControllerStatus.Stopped)
             {
                 service.Stop();

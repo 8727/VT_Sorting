@@ -174,7 +174,7 @@ namespace VT_Sorting
             if (service.Status != ServiceControllerStatus.Running)
             {
                 service.Start();
-                service.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromMinutes(1));
+                service.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromMinutes(10));
                 LogWriteLine($"---------- Service {serviceName} started ----------");
             }
         }
@@ -186,7 +186,14 @@ namespace VT_Sorting
             if (service.Status != ServiceControllerStatus.Stopped)
             {
                 service.Stop();
-                service.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromMinutes(1));
+                service.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromMinutes(10));
+                if (service.Status != ServiceControllerStatus.StopPending)
+                {
+                    foreach (var process in Process.GetProcessesByName(serviceName))
+                    {
+                        process.Kill();
+                    }
+                }
                 LogWriteLine($"---------- Service {serviceName} stopped ----------");
             }
         }

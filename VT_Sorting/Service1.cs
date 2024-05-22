@@ -170,7 +170,7 @@ namespace VT_Sorting
         void StartService(string serviceName)
         {
             ServiceController service = new ServiceController(serviceName);
-            LogWriteLine($"---------- Service {serviceName} status {service.Status} ----------");
+            LogWriteLine($"---------- Service {serviceName} status {service.Status} ----------"); 
             if (service.Status != ServiceControllerStatus.Running)
             {
                 service.Start();

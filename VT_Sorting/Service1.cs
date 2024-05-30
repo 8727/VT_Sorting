@@ -2,6 +2,7 @@
 using System;
 using System.Collections;
 using System.Configuration;
+using System.Configuration.Install;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
@@ -54,8 +55,9 @@ namespace VT_Sorting
         bool restartingServicesExport = true;
         int restartingServicesExportIntervalMinutes = 60;
 
-        bool replicator = false;
-        bool export = false;
+        uint oldTimeReplicator = 0;
+        byte replicator = 0;
+        int export = 0;
 
         int Logindex = 0;
 
@@ -88,14 +90,23 @@ namespace VT_Sorting
             storageTimer.Enabled = true;
 
             var replicatorRestartTimer = new System.Timers.Timer(restartingServicesReplicatorIntervalMinutes * 60000);
-            replicatorRestartTimer.Elapsed += OnServiceRestartTimeout;
+            replicatorRestartTimer.Elapsed += OnReplicatorRestartTimeout;
             replicatorRestartTimer.AutoReset = true;
             replicatorRestartTimer.Enabled = true;
 
             var exportRestartTimer = new System.Timers.Timer(restartingServicesExportIntervalMinutes * 60000);
-            exportRestartTimer.Elapsed += OnServiceRestartTimeout;
+            exportRestartTimer.Elapsed += OnExportRestartTimeout;
             exportRestartTimer.AutoReset = true;
             exportRestartTimer.Enabled = true;
+
+            using (RegistryKey key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\WOW6432Node\Vocord\VTTrafficReplicator"))
+            {
+                if (key != null)
+                {
+    
+                }
+            }
+
         }
 
         void ReadIndex()
@@ -156,29 +167,54 @@ namespace VT_Sorting
             SortingFiles(sourceFolderSc, sortingFolderSc);
         }
 
-        void OnServiceRestartTimeout(Object source, ElapsedEventArgs e)
+        void OnReplicatorRestartTimeout(Object source, ElapsedEventArgs e)
         {
-            if (restartingServices)
+            if (restartingServicesReplicator)
             {
-                StopService("VTTrafficExport");
-                StopService("VTTrafficReplicator");
-                StopService("VTViolations");
-                StopService("VTObjectBusSrv");
-                StopService("VTLPRService");
+                uint timeReplicator = 0;
+                using (RegistryKey key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\WOW6432Node\Vocord\VTTrafficReplicator"))
+                {
+                    if (key != null)
+                    {
+                    }
+                }
 
-                StartService("VTObjectBusSrv");
-                StartService("VTLPRService");
-                StartService("VTTrafficReplicator");
-                StartService("VTViolations");
-                StartService("VTTrafficExport");
+                if (oldTimeReplicator < timeReplicator)
+                {
+                    oldTimeReplicator = timeReplicator;
+                    replicator = 0;
+                }
+                else
+                {
+                    StopService("VTTrafficReplicator");
+                    StopService("VTViolations");
+                    StartService("VTTrafficReplicator");
+                    StartService("VTViolations");
+                    if (replicator > 3)
+                    {
+                        Process.Start("shutdown", "/r /t 0");
+                    }
+                    replicator++;
+                }
             }
+        }
 
-            ServiceController serviceEx = new ServiceController("VTTrafficExport");
-            ServiceController serviceRp = new ServiceController("VTTrafficReplicator");
-
-            if (serviceEx.Status != ServiceControllerStatus.Running || serviceRp.Status != ServiceControllerStatus.Running) 
+        void OnExportRestartTimeout(Object source, ElapsedEventArgs e)
+        {
+            if (restartingServicesExport)
             {
-                Process.Start("shutdown", "/r /t 0");
+                string[] files = Directory.GetFiles(sourceFolderPr, "*.xml", SearchOption.AllDirectories);
+                export += files.Length;
+                files = Directory.GetFiles(sourceFolderSc, "*.xml", SearchOption.AllDirectories);
+                export += files.Length;
+                if (export == 0)
+                {
+                    StopService("VTTrafficExport");
+                    StopService("VTViolations");
+                    StartService("VTTrafficExport");
+                    StartService("VTViolations");
+                }
+                export = 0;
             }
         }
 
@@ -235,6 +271,7 @@ namespace VT_Sorting
                 XmlDocument xFile = new XmlDocument();
                 string[] files = Directory.GetFiles(sourcePath, "*.xml", SearchOption.AllDirectories);
                 int countFiles = files.Length;
+                export += countFiles;
                 foreach (var file in files)
                 {
                     string name = Path.GetFileName(file);

@@ -9,7 +9,6 @@ using System.ServiceProcess;
 using System.Text.RegularExpressions;
 using System.Timers;
 using System.Xml;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 
 namespace VT_Sorting
 {
@@ -39,37 +38,48 @@ namespace VT_Sorting
             ViolationCode.Add("127", "127 - Lights");
         }
 
-        int storageDays = 10;
-        int storageSortingIntervalMinutes = 20;
-        bool storageXML = true;
-        bool storageСollage = false;
-        bool storageVideo = false;
-        bool restartingServices = true;
-        int serviceRestartIntervalHours = 6;
-        int Logindex = 0;
-
         string sourceFolderPr = "D:\\Duplo";
         string sourceFolderSc = "D:\\Doris";
         string sortingFolderPr = "D:\\!Duplo";
         string sortingFolderSc = "D:\\!Doris";
 
+        int storageDays = 10;
+        int storageSortingIntervalMinutes = 20;
+        bool storageXML = true;
+        bool storageСollage = false;
+        bool storageVideo = false;
+
+        bool restartingServicesReplicator = true;
+        int restartingServicesReplicatorIntervalMinutes = 60;
+        bool restartingServicesExport = true;
+        int restartingServicesExportIntervalMinutes = 60;
+
+        bool replicator = false;
+        bool export = false;
+
+        int Logindex = 0;
+
         void Load_Config()
         {
             if (ConfigurationManager.AppSettings.Count != 0)
             {
-                storageDays = Convert.ToInt32(ConfigurationManager.AppSettings["StorageDays"]);
-                storageSortingIntervalMinutes = Convert.ToInt32(ConfigurationManager.AppSettings["StorageSortingIntervalMinutes"]);
-                storageXML = Convert.ToBoolean(ConfigurationManager.AppSettings["StorageXML"]);
-                storageСollage = Convert.ToBoolean(ConfigurationManager.AppSettings["StorageСollage"]);
-                storageVideo = Convert.ToBoolean(ConfigurationManager.AppSettings["StorageVideo"]);
-                restartingServices = Convert.ToBoolean(ConfigurationManager.AppSettings["RestartingServices"]);
-                serviceRestartIntervalHours = Convert.ToInt32(ConfigurationManager.AppSettings["ServiceRestartIntervalHours"]);
-
                 sourceFolderPr = ConfigurationManager.AppSettings["SourceFolderPr"];
                 sortingFolderPr = ConfigurationManager.AppSettings["SortingFolderPr"];
 
                 sourceFolderSc = ConfigurationManager.AppSettings["SourceFolderSc"];
                 sortingFolderSc = ConfigurationManager.AppSettings["SortingFolderSc"];
+
+                storageDays = Convert.ToInt32(ConfigurationManager.AppSettings["StorageDays"]);
+                storageSortingIntervalMinutes = Convert.ToInt32(ConfigurationManager.AppSettings["StorageSortingIntervalMinutes"]);
+                storageXML = Convert.ToBoolean(ConfigurationManager.AppSettings["StorageXML"]);
+                storageСollage = Convert.ToBoolean(ConfigurationManager.AppSettings["StorageСollage"]);
+                storageVideo = Convert.ToBoolean(ConfigurationManager.AppSettings["StorageVideo"]);
+
+                restartingServicesReplicator = Convert.ToBoolean(ConfigurationManager.AppSettings["RestartingServicesReplicator"]);
+                restartingServicesReplicatorIntervalMinutes = Convert.ToInt32(ConfigurationManager.AppSettings["RestartingServicesReplicatorIntervalMinutes"]);
+
+                restartingServicesExport = Convert.ToBoolean(ConfigurationManager.AppSettings["RestartingServicesExport"]);
+                restartingServicesExportIntervalMinutes = Convert.ToInt32(ConfigurationManager.AppSettings["RestartingServicesExportIntervalMinutes"]);
             }
 
             var storageTimer = new System.Timers.Timer(storageSortingIntervalMinutes * 60000);
@@ -77,10 +87,15 @@ namespace VT_Sorting
             storageTimer.AutoReset = true;
             storageTimer.Enabled = true;
 
-            var serviceRestartTimer = new System.Timers.Timer(serviceRestartIntervalHours * 3600000);
-            serviceRestartTimer.Elapsed += OnServiceRestartTimeout;
-            serviceRestartTimer.AutoReset = true;
-            serviceRestartTimer.Enabled = true;
+            var replicatorRestartTimer = new System.Timers.Timer(restartingServicesReplicatorIntervalMinutes * 60000);
+            replicatorRestartTimer.Elapsed += OnServiceRestartTimeout;
+            replicatorRestartTimer.AutoReset = true;
+            replicatorRestartTimer.Enabled = true;
+
+            var exportRestartTimer = new System.Timers.Timer(restartingServicesExportIntervalMinutes * 60000);
+            exportRestartTimer.Elapsed += OnServiceRestartTimeout;
+            exportRestartTimer.AutoReset = true;
+            exportRestartTimer.Enabled = true;
         }
 
         void ReadIndex()
@@ -292,8 +307,6 @@ namespace VT_Sorting
             LogWriteLine($"---------- Service VT_Sorting START ----------");
             Load_Config();
             HashVuolation();
-            SortingFiles(sourceFolderPr, sortingFolderPr);
-            SortingFiles(sourceFolderSc, sortingFolderSc);
         }
 
         protected override void OnStop()

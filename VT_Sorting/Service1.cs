@@ -110,13 +110,13 @@ namespace VT_Sorting
             {
                 if (key != null)
                 {
-                    ReplicatorCh replicatorCh = new ReplicatorCh();
                     foreach (string ch in key.GetSubKeyNames())
                     {
                         using (RegistryKey key_ch = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\WOW6432Node\Vocord\VTTrafficReplicator\" + ch))
                         {
                             if (key_ch != null)
                             {
+                                ReplicatorCh replicatorCh = new ReplicatorCh();
                                 replicatorCh.host = key_ch.GetValue("Host").ToString();
                                 replicatorCh.LastReplicationTime = key_ch.GetValue("LastReplicationTime").ToString();
                                 replicatorCh.LastReplicationTimeFt = Convert.ToInt64(key_ch.GetValue("LastReplicationTimeFt"));

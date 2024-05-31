@@ -15,12 +15,20 @@ namespace VT_Sorting
 {
     public partial class Service1 : ServiceBase
     {
+        class ReplicatorCh
+        {
+            public string host;
+            public string LastReplicationTime;
+            public Int64 LastReplicationTimeFt;
+        }
+
         public Service1()
         {
             InitializeComponent();
         }
 
         Hashtable ViolationCode = new Hashtable();
+        Hashtable Replicator = new Hashtable();
 
         void HashVuolation()
         {
@@ -55,7 +63,6 @@ namespace VT_Sorting
         bool restartingServicesExport = true;
         int restartingServicesExportIntervalMinutes = 60;
 
-        uint oldTimeReplicator = 0;
         byte replicator = 0;
         int export = 0;
 
@@ -103,10 +110,22 @@ namespace VT_Sorting
             {
                 if (key != null)
                 {
-    
+                    ReplicatorCh replicatorCh = new ReplicatorCh();
+                    foreach (string ch in key.GetSubKeyNames())
+                    {
+                        using (RegistryKey key_ch = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\WOW6432Node\Vocord\VTTrafficReplicator\" + ch))
+                        {
+                            if (key_ch != null)
+                            {
+                                replicatorCh.host = key_ch.GetValue("Host").ToString();
+                                replicatorCh.LastReplicationTime = key_ch.GetValue("LastReplicationTime").ToString();
+                                replicatorCh.LastReplicationTimeFt = Convert.ToInt64(key_ch.GetValue("LastReplicationTimeFt"));
+                                Replicator.Add(ch, replicatorCh);
+                            }
+                        }
+                    }
                 }
             }
-
         }
 
         void ReadIndex()
@@ -147,7 +166,7 @@ namespace VT_Sorting
             {
                 sw.WriteLine(String.Format("{0:yyMMdd hh:mm:ss} {1}", DateTime.Now.ToString() + " -", message));
                 sw.Close();
-                if((logDir + $"\\{name}-log.txt").Length > 10250000) // 10250000
+                if((logDir + $"\\{name}-log.txt").Length > 25000) // 25000
                 {
                     Logindex++;
                 }
@@ -171,30 +190,39 @@ namespace VT_Sorting
         {
             if (restartingServicesReplicator)
             {
-                uint timeReplicator = 0;
-                using (RegistryKey key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\WOW6432Node\Vocord\VTTrafficReplicator"))
+                ICollection keys = Replicator.Keys;
+                foreach (string ch in keys)
                 {
-                    if (key != null)
+                    using (RegistryKey key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\WOW6432Node\Vocord\VTTrafficReplicator\" + ch))
                     {
+                        if (key != null)
+                        {
+                            Int64 timeHost = Convert.ToInt64(key.GetValue("LastReplicationTimeFt"));
+                            ReplicatorCh chr = (ReplicatorCh)Replicator[ch];
+                            if (timeHost > chr.LastReplicationTimeFt)
+                            {
+                                chr.LastReplicationTimeFt = timeHost;
+                                replicator = 0;
+                            }
+                            else
+                            {
+                                LogWriteLine($"***** No replication from crossroad {chr.host}, last replication time {chr.LastReplicationTime} *****");
+                                replicator++;
+                            }
+                        }
                     }
                 }
 
-                if (oldTimeReplicator < timeReplicator)
-                {
-                    oldTimeReplicator = timeReplicator;
-                    replicator = 0;
-                }
-                else
+                if (replicator > 0 && Replicator.Count == 1 || replicator > 1 && Replicator.Count > 1)
                 {
                     StopService("VTTrafficReplicator");
                     StopService("VTViolations");
                     StartService("VTTrafficReplicator");
                     StartService("VTViolations");
-                    if (replicator > 3)
+                    if (replicator >= (Replicator.Count * 2))
                     {
                         Process.Start("shutdown", "/r /t 0");
                     }
-                    replicator++;
                 }
             }
         }
@@ -239,7 +267,7 @@ namespace VT_Sorting
             {
                 service.Stop();
                 service.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromMinutes(2));
-                LogWriteLine($"---------- Service {serviceName} started ----------");
+                LogWriteLine($"---------- Service {serviceName} stopped ----------");
                 if (service.Status != ServiceControllerStatus.StopPending)
                 {
                     foreach (var process in Process.GetProcessesByName(serviceName))

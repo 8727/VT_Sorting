@@ -232,10 +232,17 @@ namespace VT_Sorting
         {
             if (restartingServicesExport)
             {
-                string[] files = Directory.GetFiles(sourceFolderPr, "*.xml", SearchOption.AllDirectories);
-                export += files.Length;
-                files = Directory.GetFiles(sourceFolderSc, "*.xml", SearchOption.AllDirectories);
-                export += files.Length;
+                string[] files;
+                if (Directory.Exists(sourceFolderPr))
+                {
+                    files = Directory.GetFiles(sourceFolderPr, "*.xml", SearchOption.AllDirectories);
+                    export += files.Length;
+                }
+                if (Directory.Exists(sourceFolderSc))
+                {
+                    files = Directory.GetFiles(sourceFolderSc, "*.xml", SearchOption.AllDirectories);
+                    export += files.Length;
+                }
                 if (export == 0)
                 {
                     LogWriteLine($"***** The export service did not upload more than one violation in {restartingServicesExportIntervalMinutes} minutes. *****");

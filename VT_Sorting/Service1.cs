@@ -2,12 +2,18 @@
 using System;
 using System.Collections;
 using System.Configuration;
+using System.Data.SqlClient;
 using System.Diagnostics;
 using System.IO;
+using System.Net;
+using System.Net.NetworkInformation;
 using System.Reflection;
 using System.Runtime.ConstrainedExecution;
+using System.Runtime.InteropServices;
 using System.ServiceProcess;
+using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Timers;
 using System.Xml;
 
@@ -15,6 +21,7 @@ namespace VT_Sorting
 {
     public partial class Service1 : ServiceBase
     {
+        Thread GetSQL = new Thread(GetSQLViolations);
         class ReplicatorCh
         {
             public string host;
@@ -63,6 +70,10 @@ namespace VT_Sorting
         bool restartingServicesExport = true;
         int restartingServicesExportIntervalHours = 6;
 
+        static string sqlSource = "(LOCAL)";
+        static string sqlUser = "sa";
+        static string sqlPassword = "1";
+
         byte replicator = 0;
         int export = 0;
 
@@ -89,6 +100,10 @@ namespace VT_Sorting
 
                 restartingServicesExport = Convert.ToBoolean(ConfigurationManager.AppSettings["RestartingServicesExport"]);
                 restartingServicesExportIntervalHours = Convert.ToInt32(ConfigurationManager.AppSettings["RestartingServicesExportIntervalHours"]);
+
+                sqlSource = ConfigurationManager.AppSettings["SQLDataSource"];
+                sqlUser = ConfigurationManager.AppSettings["SQLUser"];
+                sqlPassword = ConfigurationManager.AppSettings["SQLPassword"];
             }
 
             var storageTimer = new System.Timers.Timer(storageSortingIntervalMinutes * 60000);
@@ -219,7 +234,7 @@ namespace VT_Sorting
                     StopService("VTViolations");
                     StartService("VTTrafficReplicator");
                     StartService("VTViolations");
-                    if (replicator >= (Replicator.Count * 2))
+                    if (replicator > Replicator.Count)
                     {
                         LogWriteLine($"***** Reboot *****");
                         Process.Start("shutdown", "/r /t 5");
@@ -375,12 +390,51 @@ namespace VT_Sorting
             }
         }
 
+        static void GetSQLViolations()
+        {
+            string connectionString = $@"Data Source={sqlSource};Initial Catalog=AVTO;User Id={sqlUser};Password={sqlPassword};Connection Timeout=60";
+            HttpListener server = new HttpListener();
+            server.Prefixes.Add(@"http://+:8090/");
+            server.Start();
+            while (server.IsListening)
+            {
+                var context = server.GetContext();
+                int deltamin = Convert.ToInt32(context.Request.QueryString["minutes"]);
+                DateTime endDateTime = DateTime.UtcNow;
+                DateTime sqlDateTime = endDateTime.AddMinutes(-deltamin);
+                int number = 0;
+                string sqlAlarm = $"SELECT COUNT_BIG(CARS_ID) FROM[AVTO].[dbo].[CARS_VIOLATIONS] WHERE CHECKTIME > '{sqlDateTime:s}'";
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    connection.Open();
+                    SqlCommand command = new SqlCommand(sqlAlarm, connection);
+                    SqlDataReader reader = command.ExecuteReader();
+                    if (reader.Read())
+                    {
+                        number = Convert.ToInt32(reader.GetValue(0));
+                    }
+                    reader.Close();
+                }
+                var HttpResponse = context.Response;
+                HttpResponse.Headers.Add("Content-Type", "application/json");
+                HttpResponse.StatusCode = 200;
+                string responseText = "{\"violations\": " + number + "}";
+                byte[] buffer = Encoding.UTF8.GetBytes(responseText);
+                HttpResponse.ContentLength64 = buffer.Length;
+                HttpResponse.OutputStream.Write(buffer, 0, buffer.Length);
+                HttpResponse.Close();
+            }
+            server.Stop();
+            server.Close();
+        }
+
         protected override void OnStart(string[] args)
         {
             ReadIndex();
             LogWriteLine($"---------- Service VT_Sorting START ----------");
             Load_Config();
             HashVuolation();
+            GetSQL.Start();
         }
 
         protected override void OnStop()

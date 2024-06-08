@@ -5,6 +5,7 @@ using System.Configuration;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
+using System.Runtime.ConstrainedExecution;
 using System.ServiceProcess;
 using System.Text.RegularExpressions;
 using System.Timers;
@@ -60,7 +61,7 @@ namespace VT_Sorting
         bool restartingServicesReplicator = true;
         int restartingServicesReplicatorIntervalMinutes = 60;
         bool restartingServicesExport = true;
-        int restartingServicesExportIntervalMinutes = 60;
+        int restartingServicesExportIntervalHours = 6;
 
         byte replicator = 0;
         int export = 0;
@@ -87,7 +88,7 @@ namespace VT_Sorting
                 restartingServicesReplicatorIntervalMinutes = Convert.ToInt32(ConfigurationManager.AppSettings["RestartingServicesReplicatorIntervalMinutes"]);
 
                 restartingServicesExport = Convert.ToBoolean(ConfigurationManager.AppSettings["RestartingServicesExport"]);
-                restartingServicesExportIntervalMinutes = Convert.ToInt32(ConfigurationManager.AppSettings["RestartingServicesExportIntervalMinutes"]);
+                restartingServicesExportIntervalHours = Convert.ToInt32(ConfigurationManager.AppSettings["RestartingServicesExportIntervalHours"]);
             }
 
             var storageTimer = new System.Timers.Timer(storageSortingIntervalMinutes * 60000);
@@ -100,7 +101,7 @@ namespace VT_Sorting
             replicatorRestartTimer.AutoReset = true;
             replicatorRestartTimer.Enabled = true;
 
-            var exportRestartTimer = new System.Timers.Timer(restartingServicesExportIntervalMinutes * 60000);
+            var exportRestartTimer = new System.Timers.Timer(restartingServicesExportIntervalHours * 3600000);
             exportRestartTimer.Elapsed += OnExportRestartTimeout;
             exportRestartTimer.AutoReset = true;
             exportRestartTimer.Enabled = true;
@@ -205,8 +206,8 @@ namespace VT_Sorting
                             }
                             else
                             {
-                                LogWriteLine($"***** No replication from crossroad {chr.host}, last replication time {chr.LastReplicationTime} *****");
                                 replicator++;
+                                LogWriteLine($"***** No replication from crossroad {chr.host}, last replication time {chr.LastReplicationTime} ***** {replicator}");
                             }
                         }
                     }
@@ -220,7 +221,8 @@ namespace VT_Sorting
                     StartService("VTViolations");
                     if (replicator >= (Replicator.Count * 2))
                     {
-                        Process.Start("shutdown", "/r /t 0");
+                        LogWriteLine($"***** Reboot *****");
+                        Process.Start("shutdown", "/r /t 5");
                     }
                 }
             }
@@ -243,7 +245,7 @@ namespace VT_Sorting
                 }
                 if (export == 0)
                 {
-                    LogWriteLine($"***** The export service did not upload more than one violation in {restartingServicesExportIntervalMinutes} minutes. *****");
+                    LogWriteLine($"***** Export service, there were no unloading violations for {restartingServicesExportIntervalHours} hours. *****");
                     StopService("VTTrafficExport");
                     StopService("VTViolations");
                     StartService("VTTrafficExport");

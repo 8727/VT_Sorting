@@ -177,11 +177,12 @@ namespace VT_Sorting
         {
             string name = Logindex.ToString("0000");
             string logDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) + "\\log";
-            using (StreamWriter sw = new StreamWriter(logDir + $"\\{name}-log.txt", true))
+            FileInfo fileInfo = new FileInfo(logDir + $"\\{name}-log.txt");
+            using (StreamWriter sw = fileInfo.AppendText())
             {
-                sw.WriteLine(String.Format("{0:yyMMdd hh:mm:ss} {1}", DateTime.Now.ToString() + " -", message));
+                sw.WriteLine(String.Format("{0:yyMMdd hh:mm:ss} - {1}", DateTime.Now.ToString(), message));
                 sw.Close();
-                if((logDir + $"\\{name}-log.txt").Length > 25000) // 25000
+                if(fileInfo.Length > 10240)
                 {
                     Logindex++;
                 }

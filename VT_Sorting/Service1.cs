@@ -226,12 +226,8 @@ namespace VT_Sorting
                     }
                 }
 
-                if (replicator > 0 && Replicator.Count == 1 || replicator > 1 && Replicator.Count > 1)
+                if (replicator > 0)
                 {
-                    StopService("VTTrafficReplicator");
-                    StopService("VTViolations");
-                    StartService("VTTrafficReplicator");
-                    StartService("VTViolations");
                     if (replicator > Replicator.Count)
                     {
                         LogWriteLine($"***** Reboot *****");
@@ -240,6 +236,13 @@ namespace VT_Sorting
                         cmd.UseShellExecute = false;
                         cmd.ErrorDialog = false;
                         Process.Start(cmd);
+                    }
+                    else
+                    {
+                        StopService("VTTrafficReplicator");
+                        StopService("VTViolations");
+                        StartService("VTTrafficReplicator");
+                        StartService("VTViolations");
                     }
                 }
             }
@@ -275,7 +278,6 @@ namespace VT_Sorting
         void StartService(string serviceName)
         {
             ServiceController service = new ServiceController(serviceName);
-            LogWriteLine($">>>> Service {serviceName} status {service.Status}");
             if (service.Status != ServiceControllerStatus.Running)
             {
                 service.Start();
@@ -288,7 +290,6 @@ namespace VT_Sorting
         void StopService(string serviceName)
         {
             ServiceController service = new ServiceController(serviceName);
-            LogWriteLine($">>>> Service {serviceName} status {service.Status}");
             if (service.Status != ServiceControllerStatus.Stopped)
             {
                 service.Stop();

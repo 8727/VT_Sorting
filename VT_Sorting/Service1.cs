@@ -6,10 +6,7 @@ using System.Data.SqlClient;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
-using System.Net.NetworkInformation;
 using System.Reflection;
-using System.Runtime.ConstrainedExecution;
-using System.Runtime.InteropServices;
 using System.ServiceProcess;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -223,7 +220,7 @@ namespace VT_Sorting
                             else
                             {
                                 replicator++;
-                                LogWriteLine($"***** No replication from crossroad {chr.host}, last replication time {chr.LastReplicationTime} ***** {replicator}");
+                                LogWriteLine($"***** No replication from crossroad {chr.host}, last replication time {chr.LastReplicationTime} *****");
                             }
                         }
                     }
@@ -238,7 +235,11 @@ namespace VT_Sorting
                     if (replicator > Replicator.Count)
                     {
                         LogWriteLine($"***** Reboot *****");
-                        Process.Start("shutdown", "/r /t 5");
+                        var cmd = new System.Diagnostics.ProcessStartInfo("shutdown.exe", "-r -t 0");
+                        cmd.CreateNoWindow = true;
+                        cmd.UseShellExecute = false;
+                        cmd.ErrorDialog = false;
+                        Process.Start(cmd);
                     }
                 }
             }
@@ -337,9 +338,6 @@ namespace VT_Sorting
                         string data = violation_time[0].InnerText.Remove(violation_time[0].InnerText.IndexOf("T"));
                         XmlNodeList violation_camera = xFile.GetElementsByTagName("v_camera");
                         XmlNodeList violation_pr_viol = xFile.GetElementsByTagName("v_pr_viol");
-                        //string datatime = violation_time[0].InnerText.Remove(violation_time[0].InnerText.IndexOf(".") - 3);
-                        //datatime = datatime.Substring(datatime.IndexOf("T") + 1);
-                        //XmlNodeList violation_regno = xFile.GetElementsByTagName("v_regno");
 
                         string Path = outPath + "\\" + data + "\\" + (string)ViolationCode[violation_pr_viol[0].InnerText] + "\\" + violation_camera[0].InnerText + "\\";
 
@@ -440,6 +438,7 @@ namespace VT_Sorting
 
         protected override void OnStop()
         {
+            GetSQL.Interrupt();
             LogWriteLine($"---------- Service VT_Sorting STOP ----------");
         }
     }

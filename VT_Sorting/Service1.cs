@@ -6,7 +6,9 @@ using System.Data.SqlClient;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
+using System.Net.Http;
 using System.Reflection;
+using System.Runtime.ConstrainedExecution;
 using System.ServiceProcess;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -19,6 +21,8 @@ namespace VT_Sorting
     public partial class Service1 : ServiceBase
     {
         Thread GetSQL = new Thread(GetSQLViolations);
+        static HttpClient httpClient = new HttpClient();
+        TimeSpan localZone = TimeZone.CurrentTimeZone.GetUtcOffset(DateTime.Now);
         class ReplicatorCh
         {
             public string host;
@@ -33,7 +37,6 @@ namespace VT_Sorting
 
         Hashtable ViolationCode = new Hashtable();
         Hashtable Replicator = new Hashtable();
-
         void HashVuolation()
         {
             ViolationCode.Add("0", "0 - Stream");
@@ -72,6 +75,8 @@ namespace VT_Sorting
         static string sqlPassword = "1";
 
         byte replicator = 0;
+        static string lastreplicator;
+        static string replicatorSec;
         int export = 0;
 
         int Logindex = 0;
@@ -103,6 +108,11 @@ namespace VT_Sorting
                 sqlPassword = ConfigurationManager.AppSettings["SQLPassword"];
             }
 
+            var statusReplicatorTimer = new System.Timers.Timer(2 * 60000);
+            statusReplicatorTimer.Elapsed += OnStatusReplicatorTimeout;
+            statusReplicatorTimer.AutoReset = true;
+            statusReplicatorTimer.Enabled = true;
+
             var storageTimer = new System.Timers.Timer(storageSortingIntervalMinutes * 60000);
             storageTimer.Elapsed += OnStorageTimeout;
             storageTimer.AutoReset = true;
@@ -133,6 +143,11 @@ namespace VT_Sorting
                                 replicatorCh.LastReplicationTime = key_ch.GetValue("LastReplicationTime").ToString();
                                 replicatorCh.LastReplicationTimeFt = Convert.ToInt64(key_ch.GetValue("LastReplicationTimeFt"));
                                 Replicator.Add(ch, replicatorCh);
+
+                                DateTime replicatorTime = DateTime.ParseExact(replicatorCh.LastReplicationTime, "dd.MM.yyyy HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture).Add(+localZone);
+                                string interval = DateTime.Now.Subtract(replicatorTime).TotalSeconds.ToString();
+                                replicatorSec = interval.Remove(interval.LastIndexOf(','));
+                                lastreplicator = replicatorTime.ToString();
                             }
                         }
                     }
@@ -179,7 +194,7 @@ namespace VT_Sorting
             {
                 sw.WriteLine(String.Format("{0:yyMMdd hh:mm:ss} - {1}", DateTime.Now.ToString(), message));
                 sw.Close();
-                if(fileInfo.Length > 10240)
+                if(fileInfo.Length > 20480)
                 {
                     Logindex++;
                 }
@@ -189,6 +204,27 @@ namespace VT_Sorting
                 {
                     FileInfo fi = new FileInfo(delTimefile);
                     if (fi.CreationTime < DateTime.Now.AddDays(-storageDays)) { fi.Delete(); }
+                }
+            }
+        }
+
+        void OnStatusReplicatorTimeout(Object source, ElapsedEventArgs e)
+        {
+            ICollection keys = Replicator.Keys;
+            foreach (string ch in keys)
+            {
+                using (RegistryKey key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\WOW6432Node\Vocord\VTTrafficReplicator\" + ch))
+                {
+                    if (key != null)
+                    {
+                        Int64 timeHost = Convert.ToInt64(key.GetValue("LastReplicationTimeFt"));
+                        ReplicatorCh chr = (ReplicatorCh)Replicator[ch];
+                        chr.LastReplicationTime = key.GetValue("LastReplicationTime").ToString();
+                        DateTime replicatorTime = DateTime.ParseExact(chr.LastReplicationTime, "dd.MM.yyyy HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture).Add(+localZone);
+                        string interval = DateTime.Now.Subtract(replicatorTime).TotalSeconds.ToString();
+                        replicatorSec = interval.Remove(interval.LastIndexOf(','));
+                        lastreplicator = replicatorTime.ToString();
+                    }
                 }
             }
         }
@@ -212,6 +248,11 @@ namespace VT_Sorting
                         {
                             Int64 timeHost = Convert.ToInt64(key.GetValue("LastReplicationTimeFt"));
                             ReplicatorCh chr = (ReplicatorCh)Replicator[ch];
+                            chr.LastReplicationTime = key.GetValue("LastReplicationTime").ToString();
+                            DateTime replicatorTime = DateTime.ParseExact(chr.LastReplicationTime, "dd.MM.yyyy HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture).Add(+localZone);
+                            string interval = DateTime.Now.Subtract(replicatorTime).TotalSeconds.ToString();
+                            replicatorSec = interval.Remove(interval.LastIndexOf(','));
+                            lastreplicator = replicatorTime.ToString();
                             if (timeHost > chr.LastReplicationTimeFt)
                             {
                                 chr.LastReplicationTimeFt = timeHost;
@@ -220,7 +261,7 @@ namespace VT_Sorting
                             else
                             {
                                 replicator++;
-                                LogWriteLine($"***** No replication from crossroad {chr.host}, last replication time {chr.LastReplicationTime} *****");
+                                LogWriteLine($"***** No replication from crossroad {chr.host}, last replication time {lastreplicator} *****");
                             }
                         }
                     }
@@ -390,7 +431,7 @@ namespace VT_Sorting
             }
         }
 
-        static void GetSQLViolations()
+        static async void GetSQLViolations()
         {
             string connectionString = $@"Data Source={sqlSource};Initial Catalog=AVTO;User Id={sqlUser};Password={sqlPassword};Connection Timeout=60";
             HttpListener server = new HttpListener();
@@ -415,10 +456,23 @@ namespace VT_Sorting
                     }
                     reader.Close();
                 }
+
+                int statusNumber = 0;
+                HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, "http://192.168.88.21/onvif/device_service");
+                try
+                {
+                    HttpResponseMessage response = await httpClient.SendAsync(request);
+                    statusNumber = (int)response.StatusCode;
+                }
+                catch (HttpRequestException e)
+                {
+                    statusNumber = 404;
+                }
+
                 var HttpResponse = context.Response;
                 HttpResponse.Headers.Add("Content-Type", "application/json");
                 HttpResponse.StatusCode = 200;
-                string responseText = "{\"violations\": " + number + "}";
+                string responseText = "{\"violations\": " + number + ", \"reviewCamera\": " + statusNumber + ", \"lastReplicator\": \"" + lastreplicator + "\", \"lastReplicatorSec\": " + replicatorSec + "}";
                 byte[] buffer = Encoding.UTF8.GetBytes(responseText);
                 HttpResponse.ContentLength64 = buffer.Length;
                 HttpResponse.OutputStream.Write(buffer, 0, buffer.Length);
